@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Staff Console</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1>Staff console</h1>
+  <button id="login" class="secondary">Sign in as sam (approver)</button>
+  <span id="who" class="mut">not signed in</span>
+  <a class="mut right" href="/">Customer chat</a>
+</header>
+<main class="staff-main">
+  <h2>Transfers awaiting approval <span id="live" class="mut"></span></h2>
+  <div id="list"><p class="mut">Sign in to load the queue.</p></div>
+  <h2>Recent conversations</h2>
+  <div id="traces"><p class="mut">Sign in to see recent conversations.</p></div>
+  <h2>Trace replay and audit</h2>
+  <div class="row"><input id="traceid" class="grow" placeholder="trace id (32 hex) - or use Replay in the list above"><button id="loadtrace">Replay</button>
+  <button id="audit" class="secondary">Verify audit chain</button></div>
+  <p id="status" class="mut"></p>
+  <pre id="out">Nothing loaded.</pre>
+</main>
+<script src="/static/staff.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+
+====================================================================================================
+  DEMO 2: AUTHENTICATION vs AUTHORIZATION
+====================================================================================================
+
+--- 1. Alice asks for Bob's balance (ownership check happens in accounts-mcp, from the ledger)
+
+  [alice] What is the balance of account 100200300501?
+  [assistant] I'm sorry, I can't complete that: You are not authorized to access this account, or it does not exist.
+              (routes=['accounts_agent']  tools=['accounts__get_balance!access_denied']  trace=75aa1757)
+
+--- 2. Same question from a teller: elevated but scoped role -> allowed to READ any account
+
+  [tina] What is the balance of account 100200300501?
+  [assistant] The balance of your checking account ****0501 is $3,200.00.
+              (routes=['accounts_agent']  tools=['accounts__get_balance']  trace=c055fabf)
+
+--- 3. The teller tries to MOVE Bob's money (role has accounts:read:any but no transfers:initiate)
+  [assistant] I can't complete that transfer: You are not authorized to transfer from this account.
+              (routes=['transfers_agent']  tools=['payments__initiate_transfer!access_denied']  trace=d511e928)
+
+--- 4. A compromised/hallucinating agent passes someone else's customer_id as an argument
+  accounts__list_accounts(customer_id='cust_bob') as alice -> ok=False code=access_denied: You are not authorized to view these accounts.
+
+--- 5. An agent calls a tool outside its scope (accounts_agent -> payments tool), even with Alice's valid identity
+  payments__initiate_transfer with an accounts_agent token -> ok=False code=out_of_scope: Agent 'accounts_agent' is not permitted to use this tool.
+
+--- 6. Bypass the agent entirely: raw MCP calls with no token / a forged token
+  no token      -> {   "ok": false,   "error": {     "code": "unauthenticated",     "message": "The request could not be authenticated."   } }
+  forged token  -> {   "ok": false,   "error": {     "code": "unauthenticated",     "message": "The request could not be authenticated."   } }
+
+--- 7. What the audit log recorded (append-only, hash-chained, PII-masked)
+  #1   deny  actor=alice    agent=accounts_agent   accounts__get_balance          access_denied: You are not authorized to access this account, 
+  #2   allow actor=tina     agent=accounts_agent   accounts__get_balance          active
+  #3   deny  actor=tina     agent=transfers_agent  payments__initiate_transfer    access_denied: You are not authorized to transfer from this ac
+  #4   deny  actor=alice    agent=accounts_agent   accounts__list_accounts        access_denied: You are not authorized to view these accounts.
+  #5   deny  actor=alice    agent=accounts_agent   payments__initiate_transfer    tool outside scope of agent 'accounts_agent'
+  #6   deny  actor=anonymous agent=-                accounts__get_balance          tool call carries no identity token
+  #7   deny  actor=anonymous agent=-                accounts__get_balance          invalid tool token: DecodeError
+
+  audit chain verification: OK (7 rows)

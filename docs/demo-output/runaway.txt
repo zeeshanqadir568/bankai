@@ -1,0 +1,35 @@
+
+====================================================================================================
+  DEMO 3: RUNAWAY LOOPS AND COST CONTROL
+====================================================================================================
+
+--- Scenario A - agent retries the same failing tool call (account does not exist), forever
+  UNPROTECTED (limits effectively off)     LLM calls=41  tokens=68514   cost=$0.00685  stopped_by=iterations
+  PROTECTED (default limits)               LLM calls=5   tokens=2940    cost=$0.00029  stopped_by=loop
+
+  => 8.2x fewer LLM calls, 23.3x fewer tokens, 23.3x lower cost. Customer sees:
+  [assistant] I noticed I was repeating the same action without making progress, so I've stopped. A member of our team can pick this up — just say "talk to a human".
+              (routes=['accounts_agent']  tools=['accounts__get_balance!access_denied', 'accounts__get_balance!access_denied', 'accounts__get_balance!access_denied']  BUDGET_STOPPED=loop  trace=669c2ce3)
+
+--- Scenario B - the retries are never identical (limit=5,6,7...), so the loop detector cannot see them
+  UNPROTECTED                              LLM calls=41  tokens=239489  cost=$0.02395  stopped_by=iterations
+  PROTECTED (iteration cap)                LLM calls=7   tokens=7881    cost=$0.00079  stopped_by=iterations
+
+  => 5.9x fewer calls, 30.4x fewer tokens. Context grows every step, so cost is QUADRATIC in loop length:
+     unprotected tokens/call grows from ~2920 to ~11682; the cap stops it at 7.
+  PROTECTED, iteration cap lifted (token budget) LLM calls=13  tokens=21731   cost=$0.00217  stopped_by=tokens
+     (defence in depth: with the iteration cap misconfigured, the per-request TOKEN budget still stops it)
+
+--- Scenario C - two agents delegate to each other in a ping-pong (A -> B -> A -> B ...)
+  UNPROTECTED (depth cap raised 3 -> 25)   LLM calls=39  tokens=26735   cost=$0.00267  stopped_by=depth
+  PROTECTED (max delegation depth 3)       LLM calls=6   tokens=3723    cost=$0.00037  stopped_by=depth
+  [assistant] This request required too many nested hand-offs between my specialists, so I've stopped. A member of our team can pick this up — just say "talk to a human".
+              (routes=['accounts_agent']  tools=[]  BUDGET_STOPPED=depth  trace=29ac6b55)
+
+--- Scenario D - per-user daily budget: a customer (or a script) hammering the assistant
+  request #4: refused BEFORE any LLM call -> You've reached today's usage limit for the assistant. A member of our team can pick this up — just say "talk to a human".
+  bob is unaffected: ok
+
+--- Cost tracking per agent / provider for this run
+  accounts_agent calls=8   tokens=4961   cost=$0.000496
+  coordinator    calls=4   tokens=1472   cost=$0.000147

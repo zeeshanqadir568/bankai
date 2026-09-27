@@ -1,0 +1,25 @@
+
+====================================================================================================
+  DEMO 5: ONE AGENT WITH EVERY TOOL vs SPECIALISED AGENTS
+====================================================================================================
+
+--- Tools in the catalog vs tools each agent is given
+  MCP catalog (all servers, incl. staff-only tools): 12 tools
+  monolith agent                                   : 10 tools,  845 schema tokens on EVERY llm call
+  accounts_agent                                   :  3 tools,  242 schema tokens   ['get_balance', 'get_transactions', 'list_accounts']
+  transfers_agent                                  :  3 tools,  248 schema tokens   ['get_transfer_status', 'initiate_transfer', 'list_payees']
+  faq_agent                                        :  1 tools,   74 schema tokens   ['search_faq']
+  tickets_agent                                    :  3 tools,  281 schema tokens   ['create_ticket', 'get_ticket', 'list_tickets']
+
+--- Same request, both designs: 'What is my balance?'
+  specialised: 1624 tokens for the turn | monolith: 2688 tokens (1.66x) - same answer, more tokens, and the gap grows with every tool added
+  (and with every extra LLM step: the schema is re-sent each iteration).
+
+--- Blast radius: what can a prompt-injected agent DO?
+  accounts_agent can reach : ['accounts__get_balance', 'accounts__get_transactions', 'accounts__list_accounts']  -> read-only
+  monolith can reach       : 10 tools including payments__initiate_transfer -> can move money
+  Even if the model is fully compromised, the specialised accounts agent has nothing dangerous to call; and each agent's
+  delegated token lists only its own tools, so the tool servers refuse anything else (see demos.authz #5).
+
+--- Other reasons (see DECISIONS.md): independent prompts/evals per domain, per-agent cost attribution, per-agent model choice,
+     independent failure (transfers down != balances down).

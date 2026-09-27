@@ -1,0 +1,38 @@
+
+====================================================================================================
+  DEMO 6: HYBRID ROUTING AND PII EGRESS
+====================================================================================================
+
+--- Routing decisions (per LLM call, by task + data class + PII scan; default is LOCAL)
+
+  [alice] What are your branch hours?
+      coordinator->local(task_not_eligible:classify), faq_agent->external(eligible_public_task(redactions=0)), faq_agent->external(eligible_public_task(redactions=0))
+
+  [alice] I'm Alice Johnson (alice.johnson@example.com), what are your branch hours?
+      coordinator->local(task_not_eligible:classify), faq_agent->external(eligible_public_task(redactions=2)), faq_agent->local(too_much_pii)
+
+  [alice] My account 100200300401 wants to know the mortgage rate
+      coordinator->local(task_not_eligible:classify), faq_agent->local(high_sensitivity_pii), faq_agent->local(high_sensitivity_pii)
+
+  [alice] My card 4111 1111 1111 1111 was charged an overdraft fee, what is the fee policy?
+      coordinator->local(task_not_eligible:classify), faq_agent->local(high_sensitivity_pii), faq_agent->local(high_sensitivity_pii)
+
+  [alice] What's my balance?
+      coordinator->local(task_not_eligible:classify), accounts_agent->local(task_not_eligible:agent), accounts_agent->local(task_not_eligible:agent)
+
+--- What the external model server ACTUALLY received (ground truth captured at the provider boundary)
+   1. "You are the POLICY and FAQ specialist of a retail bank's assistant.\n\nTools you may use: knowledge__search_faq."
+   2. 'What are your branch hours?'
+   3. "You are the POLICY and FAQ specialist of a retail bank's assistant.\n\nTools you may use: knowledge__search_faq."
+   4. 'What are your branch hours?'
+   6. '<untrusted_data source="knowledge__search_faq">\n{"ok": true, "query": "What are your branch hours?", "results"'
+   7. "{'query': 'What are your branch hours?'}"
+   8. "You are the POLICY and FAQ specialist of a retail bank's assistant.\n\nTools you may use: knowledge__search_faq."
+   9. "I'm <PERSON_1> (<EMAIL_1>), what are your branch hours?"
+
+  PII detected in everything the external model received: NONE
+
+--- Egress log (every external attempt: hash, redaction count, re-verification result)
+  redactions=0 verified_clean=True blocked=False sha256=addd802ed76d.. preview="You are the POLICY and FAQ specialist of a retail bank's ass"
+  redactions=0 verified_clean=True blocked=False sha256=eb18169c1765.. preview="You are the POLICY and FAQ specialist of a retail bank's ass"
+  redactions=2 verified_clean=True blocked=False sha256=c17a23cdbc2f.. preview="You are the POLICY and FAQ specialist of a retail bank's ass"

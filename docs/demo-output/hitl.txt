@@ -1,0 +1,40 @@
+
+====================================================================================================
+  DEMO 4: HUMAN-IN-THE-LOOP APPROVAL
+====================================================================================================
+
+--- 1. Alice asks for a $1,500 transfer (above the $1,000 review threshold)
+
+  [alice] Transfer $1500 from savings to Bob
+  [assistant] Please confirm: transfer $1,500.00 from ****0402 to ****0501. Reply "yes" to confirm or "no" to cancel.
+              (routes=['transfers_agent']  tools=['payments__list_payees', 'accounts__list_accounts', 'payments__initiate_transfer!confirmation_required']  guard_blocks=['confirmation_required']  trace=b59871e6)
+
+  [alice] yes
+  [assistant] Your transfer of $1,500.00 to ****0501 needs a quick review by our staff (amount over threshold). No money has moved yet, and I'll let you know as soon as it's decided. Reference: apr_971384e56187.
+              (routes=['transfers_agent']  tools=['payments__initiate_transfer']  approvals=['apr_971384e56187']  trace=ae500875)
+
+  balances now: alice savings $25,000.00, bob $3,200.00  (nothing moved; agent run is PAUSED)
+
+--- 2. The approval request lands in the staff queue (pushed over SSE to /staff; also listable via the tool layer)
+  apr_971384e56187: $1,500.00 ****0402 -> ****0501  requested_by=alice  reasons=['amount_over_threshold']
+
+--- 3. Who may decide? Customers, tellers, and the requester themselves are refused by the tool layer
+  alice tries to approve -> access_denied: No role of the caller grants approvals:decide.
+  tina tries to approve -> access_denied: No role of the caller grants approvals:decide.
+
+--- 4. Sam approves; the decision event resumes the paused conversation
+  sam approves -> approved / transfer completed   balances: bob $4,700.00, alice savings $23,500.00
+  double-click (same idempotency key) -> replayed=True, still one debit: bob $4,700.00
+  [notification to alice] Good news: your transfer of $1,500.00 was approved and completed.
+
+--- 5. Denial path
+  sam denies -> denied; bob $4,700.00 (unchanged)
+  [notification to alice] Your transfer was reviewed and declined by our staff. No money moved. Please contact us if you have questions.
+
+--- 6. Timeout path (nobody reviews within the window)
+  sweeper expired 1 approval(s); a late approval attempt -> already_decided: Approval already expired.; bob $4,700.00 (unchanged)
+  [notification to alice] Your transfer was not reviewed in time and has expired. No money moved; you can try again.
+
+--- 7. New payee (small amount, but never paid before) also needs review
+  [assistant] Your transfer of $20.00 to ****9000 needs a quick review by our staff (new payee). No money has moved yet, and I'll let you know as soon as it's decided. Reference: apr_20ce952b4efb.
+              (routes=['transfers_agent']  tools=['payments__initiate_transfer']  approvals=['apr_20ce952b4efb']  trace=06ed68ae)

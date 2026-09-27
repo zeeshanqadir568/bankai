@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank AI Assistant</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1>Bank AI Assistant</h1>
+  <label class="mut" for="user">Sign in as (dev IdP)</label>
+  <select id="user">
+    <option value="alice">alice (customer)</option>
+    <option value="bob">bob (customer)</option>
+    <option value="tina">tina (teller)</option>
+    <option value="sam">sam (approver)</option>
+  </select>
+  <button id="login" class="secondary">Sign in</button>
+  <span id="who" class="mut">not signed in</span>
+  <a class="mut right" href="/staff">Staff console</a>
+</header>
+<main>
+  <div id="log" aria-live="polite"></div>
+</main>
+<form id="form">
+  <input id="msg" autocomplete="off" placeholder="Ask about balances, transfers, policies, tickets..." maxlength="2000" disabled>
+  <button id="send" disabled>Send</button>
+</form>
+<script src="/static/chat.js"></script>
+</body>
+</html>

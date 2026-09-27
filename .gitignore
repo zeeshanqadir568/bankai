@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/*
+!data/.gitkeep
+secrets/*
+!secrets/.gitkeep
+*.db
+evals/reports/
+.env
+*.egg-info/
+
+# local working notes
+HANDOFF.md
